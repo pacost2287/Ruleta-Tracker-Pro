@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ruleta Tracker Pro</title>
+    
+    <!-- PWA Enlaces -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b4e1c">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <style>
+        body { margin: 0; background: #0b4e1c; color: white; font-family: sans-serif; height: 100vh; display: flex; flex-direction: column; user-select: none; }
+        #mesa { display: grid; grid-template-columns: 80px 1fr 1fr 1fr; grid-auto-rows: minmax(45px, auto); gap: 2px; padding: 5px; flex: 1; }
+        .c { display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #fff; cursor: pointer; font-weight: bold; position: relative; }
+        .stat-val { font-size: 1.2em; font-weight: bold; }
+        .lvl-badge { font-size: 0.7em; color: #ffff00; font-weight: bold; }
+        .c-zero { grid-column: 1 / span 4; background: #27ae60; }
+        
+        #box-d0 { grid-column: 1; grid-row: 2 / span 4; background: #1e7e34; }
+        #box-d1 { grid-column: 1; grid-row: 6 / span 4; background: #1e7e34; }
+        #box-d2 { grid-column: 1; grid-row: 10 / span 4; background: #1e7e34; }
+        
+        #box-c0 { grid-column: 2; grid-row: 14; background: #1e7e34; }
+        #box-c1 { grid-column: 3; grid-row: 14; background: #1e7e34; }
+        #box-c2 { grid-column: 4; grid-row: 14; background: #1e7e34; }
+
+        .r { background: #c0392b; } .b { background: #1a1a1a; }
+        
+        .hot { border: 4px solid #ffd700 !important; box-shadow: inset 0 0 10px #ffd700; z-index: 10; }
+        .warn-yellow { border: 4px solid #ffff00 !important; }
+        .warn-red { border: 4px solid #ff0000 !important; background-color: #581515 !important; }
+
+        #stats { background: #000; padding: 10px; display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+    <div id="mesa">
+        <div class="c c-zero" onclick="reg(0)">0</div>
+        <div class="c" id="box-d0">1ª<span class="stat-val" id="count-d0">0</span><div class="lvl-badge" id="lvl-d0"></div></div>
+        <div class="c" id="box-d1">2ª<span class="stat-val" id="count-d1">0</span><div class="lvl-badge" id="lvl-d1"></div></div>
+        <div class="c" id="box-d2">3ª<span class="stat-val" id="count-d2">0</span><div class="lvl-badge" id="lvl-d2"></div></div>
+        <script>
+            for(let i=1; i<=36; i++) {
+                let color = ([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(i)) ? 'r' : 'b';
+                document.write(`<div class="c ${color} n-${i}" id="num-${i}" onclick="reg(${i})">${i}</div>`);
+            }
+        </script>
+        <div class="c" id="box-c0">C1<span class="stat-val" id="count-c0">0</span><div class="lvl-badge" id="lvl-c0"></div></div>
+        <div class="c" id="box-c1">C2<span class="stat-val" id="count-c1">0</span><div class="lvl-badge" id="lvl-c1"></div></div>
+        <div class="c" id="box-c2">C3<span class="stat-val" id="count-c2">0</span><div class="lvl-badge" id="lvl-c2"></div></div>
+    </div>
+    
+    <div id="stats">
+        <span id="txt">Rondas: 0</span> <button onclick="res()">Reset</button>
+    </div>
+
+    <script>
+        let counts = Array(37).fill(0), rounds = 0;
+        let dLevels = [0,0,0], cLevels = [0,0,0];
+        let lastTie = { d: null, c: null };
+
+        function reg(n) { if(n > 0) counts[n]++; rounds++; update(); }
+
+        function processLogic(vals, levels, prefix) {
+            if (vals[0] === vals[1] && vals[1] === vals[2]) {
+                for(let i=0; i<3; i++) {
+                    document.getElementById(`box-${prefix}${i}`).className = `c warn-yellow`;
+                    levels[i] = 0; document.getElementById(`lvl-${prefix}${i}`).innerText = '';
+                }
+                return;
+            }
+            let pairs = [vals[0] === vals[1] ? [0, 1] : null, vals[0] === vals[2] ? [0, 2] : null, vals[1] === vals[2] ? [1, 2] : null].filter(p => p !== null);
+            for(let i=0; i<3; i++) {
+                document.getElementById(`box-${prefix}${i}`).className = `c`;
+                if (!pairs.some(p => p.includes(i))) levels[i] = 0;
+            }
+            if (pairs.length === 1) {
+                let p = pairs[0];
+                let isSamePair = (lastTie[prefix] && lastTie[prefix][0] === p[0] && lastTie[prefix][1] === p[1]);
+                if (isSamePair) { levels[p[0]]++; levels[p[1]]++; } else { levels[p[0]] = 1; levels[p[1]] = 1; }
+                p.forEach(idx => {
+                    document.getElementById(`box-${prefix}${idx}`).className = `c ${levels[idx] > 1 ? 'warn-red' : 'warn-yellow'}`;
+                    document.getElementById(`lvl-${prefix}${idx}`).innerText = `Lvl:${levels[idx]}`;
+                });
+                lastTie[prefix] = p;
+            } else { lastTie[prefix] = null; }
+        }
+
+        function update() {
+            document.getElementById('txt').innerText = `Rondas: ${rounds}`;
+            for(let i=1; i<=36; i++) { document.getElementById(`num-${i}`).classList.remove('hot'); }
+            let maxCount = Math.max(...counts.slice(1));
+            if(maxCount > 0) {
+                let hotIdx = counts.indexOf(maxCount);
+                document.getElementById(`num-${hotIdx}`).classList.add('hot');
+            }
+            let dVals = [counts.slice(1,13).reduce((a,b)=>a+b,0), counts.slice(13,25).reduce((a,b)=>a+b,0), counts.slice(25,37).reduce((a,b)=>a+b,0)];
+            let cVals = [0,0,0];
+            for(let i=1; i<=36; i++) cVals[(i-1)%3] += counts[i];
+            processLogic(dVals, dLevels, 'd');
+            processLogic(cVals, cLevels, 'c');
+            for(let i=0; i<3; i++) {
+                document.getElementById(`count-d${i}`).innerText = dVals[i];
+                document.getElementById(`count-c${i}`).innerText = cVals[i];
+            }
+        }
+        function res() { location.reload(); }
+
+        // --- REGISTRO DEL SERVICE WORKER PARA PWA ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => console.log('SW registrado', registration.scope))
+                    .catch(err => console.log('Error al registrar SW', err));
+            });
+        }
+    </script>
+</body>
+</html>
